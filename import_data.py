@@ -10,7 +10,7 @@ import pandas as pd
 pd.core.common.is_list_like = pd.api.types.is_list_like
 from pandas_datareader import data, wb
 import os
-os.chdir('/Users/Raphael/') #Select your working directory
+os.chdir('/Users/Raphael/Github/ML-Stock-Prices/') #Select your working directory
 cwd = os.getcwd()
 import matplotlib.pyplot as plt
 
@@ -19,10 +19,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from datetime import datetime, timedelta
 
+import importlib
+Functions=importlib.import_module("functions")
+Functions=importlib.reload(Functions)
+
 #%% Import the data
 
 end = datetime.now()
-start = end - timedelta(days=900)
+start = end - timedelta(days=1500)
 
 stock_prices_serie = web.DataReader("GOOGL", 'iex', start, end)
 
@@ -34,37 +38,22 @@ stock_prices_serie.drop(["volume"], axis = 1).plot()
 # Variable of interest
 var = "close"
 
-time_serie = stock_prices_serie.close.values.reshape(-1, 1)
+time_serie_train = stock_prices_serie.close.values.reshape(-1, 1)[:700]
+
+time_serie_test = stock_prices_serie.close.values.reshape(-1, 1)[700:]
 
 #%% Scaler
 
 from sklearn.preprocessing import MinMaxScaler
 sc = MinMaxScaler(feature_range = (0,1))
-time_serie = sc.fit_transform(time_serie)
+sc.fit(time_serie_train)
+time_serie_train = sc.transform(time_serie_train)
+time_serie_test = sc.transform(time_serie_test)
 
-#%% Construction du data set sous forme "matricielle"
+#%%
+X_train, Y_train = Functions.transform_data(time_serie_train, 60, 1)
 
-# Variable de lag
-lag_input = 60
-
-# Target variable:
-target_day = 1
-
-X = []
-Y = []
-
-for i in range(60, time_serie.shape[0]):
-    X.append(time_serie[i-60:i])
-    Y.append(time_serie[i])
-    
-X = np.array(X)
-Y = np.array(Y)
-
-X = X.reshape((X.shape[0], X.shape[1], 1))
-
-#data_df.reshape((622,61))
-
-
+X_test, Y_test = Functions.transform_data(time_serie_test, 60, 1)
 
 #%%
 from keras.models import Sequential
@@ -90,17 +79,22 @@ regressor.add(Dropout(0.2))
 
 regressor.add(Dense(units = 1))
 regressor.compile(optimizer = 'adam', loss = 'mean_squared_error')
-#%%
-regressor.fit(X, Y, epochs = 10, validation_split=0.5)
-#%%
-Y_pred = regressor.predict(X)
-Y_pred
-#%%
-plt.figure
-plt.plot(sc.inverse_transform(Y_pred).reshape(Y_pred.shape[0]), color = 'blue', label = 'Predicted Price')
-plt.plot(stock_prices_serie.close.values[60:], color = 'red', label = 'Real Price')
+#%% Train the model
+
+regressor.fit(X_train, Y_train, epochs = 20, validation_split=0.5)
+
+
+#%% Prediction and plot predictions
+
+Y_pred = regressor.predict(X_test)
+
+plt.plot(np.append(sc.inverse_transform(Y_train), sc.inverse_transform(Y_pred)), color = 'blue', label = 'Predicted Price')
+plt.plot(np.append(sc.inverse_transform(Y_train), sc.inverse_transform(Y_test)), color = 'red', label = 'Real Price')
 plt.title('Google Stock Price Prediction')
 plt.xlabel('Time')
 plt.ylabel('Google Stock Price')
 plt.legend()
 plt.show()
+
+
+
