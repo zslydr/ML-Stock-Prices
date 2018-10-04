@@ -28,21 +28,26 @@ def import_stock_price(stock_name, from_ = 365):
     
     return(stock_prices_serie)
 
-def transform_data(time_serie, lag_input, horizon):
+def transform_data(time_serie, lag_input, from_, horizon):
     
     X = []
     Y = []
     
     for i in range(lag_input, time_serie.shape[0] - horizon):
         X.append(time_serie[i-lag_input:i])
-        Y.append(time_serie[i + horizon])
+        Y.append(time_serie[i + from_ - 1: i + horizon, 0])
         
     X = np.array(X)
     Y = np.array(Y)
     
-    X = X.reshape((X.shape[0], X.shape[1], 1))
-    Y = Y.reshape((Y.shape[0], 1))
+    X = X.reshape((X.shape[0], X.shape[1], time_serie.shape[1]))
+    Y = Y.reshape((Y.shape[0], horizon - from_ + 1))
     return(X, Y)
+    
+def normalize_rate(serie):
+    p0 = serie[0][0]
+    print(p0)
+    return(serie/p0 - 1)
     
     
 def iterate_model(model, last_n_values, horizon):
@@ -51,8 +56,12 @@ def iterate_model(model, last_n_values, horizon):
     #last_n_values = 
     
     for i in range(horizon):
-        new_value = regressor.predict(last_n_values)
+        new_value = model.predict(last_n_values)
         Y_pred.append(new_value[0, 0])
-        last_n_values = np.append(last_n_values[0, 1:, :], new_value).reshape((1, X_test.shape[1], 1))
+        last_n_values = np.append(last_n_values[0, 1:, :], new_value).reshape((1, last_n_values.shape[1], 1))
         print("année n+"+str(i), new_value[0, 0])
     return(np.array(Y_pred).reshape((horizon, 1)))
+    
+
+    
+    
